@@ -40,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "draw/NotificationRenderer.h"
 #include "draw/UIRenderer.h"
 #include "modules/CannedMessageModule.h"
+#include "modules/OnScreenKeyboardModule.h"
 
 #if !MESHTASTIC_EXCLUDE_GPS
 #include "GPS.h"
@@ -543,8 +544,8 @@ void Screen::handleSetOn(bool on, FrameCallback einkScreensaver)
                 io.digitalWrite(PCA_PIN_EINK_EN, HIGH);
 #endif
 
-#if defined(ST7789_CS) &&                                                                                                        \
-    !defined(M5STACK) // set display brightness when turning on screens. Just moved function from TFTDisplay to here.
+#if (defined(ST7789_CS) && !defined(M5STACK)) || defined(CHATTER_2)
+            // Restore TFT brightness when turning the screen back on.
             static_cast<TFTDisplay *>(dispdev)->setDisplayBrightness(brightness);
 #endif
 
@@ -693,7 +694,7 @@ void Screen::setup()
     ui->getUiState()->userData = this;     // Allow static callbacks to access Screen instance
 
     // Apply loaded brightness
-#if defined(ST7789_CS)
+#if defined(ST7789_CS) || defined(CHATTER_2)
     static_cast<TFTDisplay *>(dispdev)->setDisplayBrightness(brightness);
 #elif defined(USE_OLED) || defined(USE_SSD1306) || defined(USE_SH1106) || defined(USE_SH1107) || defined(USE_SPISSD1306)
     dispdev->setBrightness(brightness);
@@ -1815,12 +1816,19 @@ int Screen::handleInputEvent(const InputEvent *event)
     if (!screenOn)
         return 0;
 
-    // Handle text input notifications specially - pass input to virtual keyboard
+    // Handle text input notifications directly through the active virtual keyboard.
+    // This is important for physical keyboards such as Chatter, which may emit
+    // BACKSPACE followed immediately by a replacement character for multi-tap input.
     if (NotificationRenderer::current_notification_type == notificationTypeEnum::text_input) {
-        NotificationRenderer::inEvent = *event;
-        static OverlayCallback overlays[] = {graphics::UIRenderer::drawNavigationBar, NotificationRenderer::drawBannercallback};
+        OnScreenKeyboardModule::instance().handleInput(*event);
+
+        static OverlayCallback overlays[] = {
+            graphics::UIRenderer::drawNavigationBar,
+            NotificationRenderer::drawBannercallback
+        };
+
         ui->setOverlays(overlays, sizeof(overlays) / sizeof(overlays[0]));
-        setFastFramerate(); // Draw ASAP
+        setFastFramerate();
         ui->update();
         return 0;
     }

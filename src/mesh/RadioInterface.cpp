@@ -227,6 +227,11 @@ static uint8_t bytes[MAX_LORA_PAYLOAD_LEN + 1];
 LoRaRadioType radioType = NO_RADIO;
 
 extern RadioLibHal *RadioLibHAL;
+
+#if defined(CHATTER_V21_HSPI) && defined(ARCH_ESP32)
+extern SPIClass ChatterLoRaSPI;
+#endif
+
 #if defined(HW_SPI1_DEVICE) && defined(ARCH_ESP32)
 extern SPIClass SPI1;
 #endif
@@ -293,6 +298,9 @@ std::unique_ptr<RadioInterface> initLoRa()
         LOG_INFO("%s init success", portduino_config.loraModules[portduino_config.lora_module].c_str());
     }
 
+#elif defined(CHATTER_V21_HSPI)
+    LockingArduinoHal *loraHal = new LockingArduinoHal(ChatterLoRaSPI, loraSpiSettings);
+    RadioLibHAL = loraHal;
 #elif defined(HW_SPI1_DEVICE)
     LockingArduinoHal *loraHal = new LockingArduinoHal(SPI1, loraSpiSettings);
     RadioLibHAL = loraHal;

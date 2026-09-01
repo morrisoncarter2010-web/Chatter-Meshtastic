@@ -1998,7 +1998,7 @@ void menuHandler::BrightnessPickerMenu()
 #if defined(HELTEC_MESH_NODE_T114) || defined(HELTEC_VISION_MASTER_T190)
             // For HELTEC devices, use analogWrite to control backlight
             analogWrite(VTFT_LEDA, uiconfig.screen_brightness);
-#elif defined(ST7789_CS) || defined(ST7796_CS)
+#elif defined(ST7789_CS) || defined(ST7796_CS) || defined(CHATTER_2)
             static_cast<TFTDisplay *>(screen->getDisplayDevice())->setDisplayBrightness(uiconfig.screen_brightness);
 #elif defined(USE_OLED) || defined(USE_SSD1306) || defined(USE_SH1106) || defined(USE_SH1107)
             screen->getDisplayDevice()->setBrightness(uiconfig.screen_brightness);
@@ -2067,7 +2067,7 @@ void menuHandler::TFTColorPickerMenu(OLEDDisplay *display)
             }
 
 #if defined(HELTEC_MESH_NODE_T114) || defined(HELTEC_VISION_MASTER_T190) || defined(T_DECK) || defined(T_LORA_PAGER) ||          \
-    HAS_TFT || defined(HACKADAY_COMMUNICATOR)
+    HAS_TFT || defined(HACKADAY_COMMUNICATOR) || defined(CHATTER_2)
             const ScreenColor &color = option.value;
             if (color.useVariant) {
                 LOG_INFO("Setting color to system default or defined variant");
@@ -2316,7 +2316,8 @@ void menuHandler::screenOptionsMenu()
 #if defined(T_DECK)
     // TDeck Doesn't seem to support brightness at all, at least not reliably
     bool hasSupportBrightness = false;
-#elif defined(ST7789_CS) || defined(USE_OLED) || defined(USE_SSD1306) || defined(USE_SH1106) || defined(USE_SH1107)
+#elif defined(ST7789_CS) || defined(USE_OLED) || defined(USE_SSD1306) || defined(USE_SH1106) || defined(USE_SH1107) || \
+    defined(CHATTER_2)
     bool hasSupportBrightness = true;
 #else
     bool hasSupportBrightness = false;
@@ -2335,7 +2336,7 @@ void menuHandler::screenOptionsMenu()
 
     // Only show screen color for TFT displays
 #if defined(HELTEC_MESH_NODE_T114) || defined(HELTEC_VISION_MASTER_T190) || defined(T_DECK) || defined(T_LORA_PAGER) ||          \
-    HAS_TFT || defined(HACKADAY_COMMUNICATOR)
+    HAS_TFT || defined(HACKADAY_COMMUNICATOR) || defined(CHATTER_2)
     optionsArray[options] = "Screen Color";
     optionsEnumArray[options++] = ScreenColor;
 #endif

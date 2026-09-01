@@ -164,6 +164,10 @@ void setupNicheGraphics();
 SPIClass SPI1(HSPI);
 #endif
 
+#if defined(CHATTER_V21_HSPI) && defined(ARCH_ESP32)
+SPIClass ChatterLoRaSPI(HSPI);
+#endif
+
 using namespace concurrency;
 
 volatile static const char slipstreamTZString[] = {USERPREFS_TZ_STRING};
@@ -829,7 +833,11 @@ void setup()
 #endif
 #else
         // ESP32
-#if defined(HW_SPI1_DEVICE)
+#if defined(CHATTER_V21_HSPI)
+    ChatterLoRaSPI.begin(LORA_SCK, LORA_MISO, LORA_MOSI, LORA_CS);
+    LOG_DEBUG("ChatterLoRaSPI.begin(SCK=%d, MISO=%d, MOSI=%d, NSS=%d)", LORA_SCK, LORA_MISO, LORA_MOSI, LORA_CS);
+    ChatterLoRaSPI.setFrequency(4000000);
+#elif defined(HW_SPI1_DEVICE)
     SPI1.begin(LORA_SCK, LORA_MISO, LORA_MOSI, LORA_CS);
     LOG_DEBUG("SPI1.begin(SCK=%d, MISO=%d, MOSI=%d, NSS=%d)", LORA_SCK, LORA_MISO, LORA_MOSI, LORA_CS);
     SPI1.setFrequency(4000000);

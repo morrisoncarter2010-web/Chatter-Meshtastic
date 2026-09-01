@@ -70,14 +70,14 @@ int32_t SerialKeyboard::runOnce()
         byte shiftRegister1 = shiftIn(KB_DATA, KB_CLK, LSBFIRST);
         byte shiftRegister2 = shiftIn(KB_DATA, KB_CLK, LSBFIRST);
 
-        keys = (shiftRegister1 << 8) + shiftRegister2;
+        keys = ((uint16_t)shiftRegister1 << 8) | shiftRegister2;
 
         // Print to serial monitor
         // Serial.print (shiftRegister1, BIN);
         // Serial.print ("X");
         // Serial.println (shiftRegister2, BIN);
 
-        if (!Throttle::isWithinTimespanMs(lastPressTime, 500)) {
+        if (!Throttle::isWithinTimespanMs(lastPressTime, 1000)) {
             quickPress = 0;
         }
 
@@ -86,6 +86,7 @@ int32_t SerialKeyboard::runOnce()
             InputEvent e = {};
             e.inputEvent = INPUT_BROKER_NONE;
             e.source = this->_originName;
+
             // SELECT OR SEND OR CANCEL EVENT
             if (!(shiftRegister2 & (1 << 3))) {
                 if (shift > 0) {
@@ -132,6 +133,7 @@ int32_t SerialKeyboard::runOnce()
             } else if (!(shiftRegister1 & (1 << 0))) {
                 keyPressed = 9;
             }
+
             // BACKSPACE or TAB
             else if (!(shiftRegister1 & (1 << 7))) {
                 if (shift == 0 || shift == 2) { // BACKSPACE
@@ -142,25 +144,29 @@ int32_t SerialKeyboard::runOnce()
                     e.kbchar = 0x09;
                 }
             }
+
             // SHIFT
             else if (!(shiftRegister2 & (1 << 7))) {
                 keyPressed = 10;
             }
 
             if (keyPressed < 11) {
-                if (keyPressed == lastKeyPressed && millis() - lastPressTime < 500) {
+                if (keyPressed == lastKeyPressed && millis() - lastPressTime < 1000) {
                     quickPress += 1;
                     if (quickPress > 3) {
                         quickPress = 0;
                     }
                 }
+
                 if (keyPressed != lastKeyPressed) {
                     quickPress = 0;
                 }
+
                 if (keyPressed < 10) { // if it's a letter
-                    if (keyPressed == lastKeyPressed && millis() - lastPressTime < 500) {
+                    if (keyPressed == lastKeyPressed && millis() - lastPressTime < 1000) {
                         erase();
                     }
+
                     e.inputEvent = INPUT_BROKER_ANYKEY;
                     e.kbchar = char(KeyMap[shift][quickPress][keyPressed]);
                 } else { // then it's shift
@@ -169,6 +175,7 @@ int32_t SerialKeyboard::runOnce()
                         shift = 0;
                     }
                 }
+
                 lastPressTime = millis();
                 lastKeyPressed = keyPressed;
                 keyPressed = 13;
@@ -178,8 +185,10 @@ int32_t SerialKeyboard::runOnce()
                 this->notifyObservers(&e);
             }
         }
+
         prevKeys = keys;
     }
+
     return 50;
 }
 

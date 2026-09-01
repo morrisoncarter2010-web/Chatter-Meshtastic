@@ -735,23 +735,15 @@ void NotificationRenderer::drawTextInput(OLEDDisplay *display, OLEDDisplayUiStat
         // Check for timeout and auto-exit if needed
         if (virtualKeyboard->isTimedOut()) {
             LOG_INFO("Virtual keyboard timeout - auto-exiting");
-            // Cancel virtual keyboard - call callback with empty string to indicate timeout
-            auto callback = textInputCallback; // Store callback before clearing
 
-            // Clean up first to prevent re-entry
-            delete virtualKeyboard;
-            virtualKeyboard = nullptr;
-            textInputCallback = nullptr;
+            // OnScreenKeyboardModule owns the VirtualKeyboard.
+            // resetBanner() calls stop(false), which performs the single
+            // authoritative delete and clears the legacy pointers.
+            auto callback = textInputCallback;
             resetBanner();
 
-            // Call callback after cleanup
             if (callback) {
                 callback("");
-            }
-
-            // Restore normal overlays
-            if (screen) {
-                screen->setFrames(graphics::Screen::FOCUS_PRESERVE);
             }
             return;
         }
@@ -760,15 +752,13 @@ void NotificationRenderer::drawTextInput(OLEDDisplay *display, OLEDDisplayUiStat
             bool handled = OnScreenKeyboardModule::processVirtualKeyboardInput(inEvent, virtualKeyboard);
             if (!handled && inEvent.inputEvent == INPUT_BROKER_CANCEL) {
                 auto callback = textInputCallback;
-                delete virtualKeyboard;
-                virtualKeyboard = nullptr;
-                textInputCallback = nullptr;
+
+                // OnScreenKeyboardModule owns the VirtualKeyboard.
+                // resetBanner() performs cleanup through stop(false).
                 resetBanner();
+
                 if (callback) {
                     callback("");
-                }
-                if (screen) {
-                    screen->setFrames(graphics::Screen::FOCUS_PRESERVE);
                 }
                 return;
             }

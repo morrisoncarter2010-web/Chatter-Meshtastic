@@ -21,6 +21,8 @@ struct VirtualKey {
 
 class VirtualKeyboard
 {
+  friend class OnScreenKeyboardModule;
+
   public:
     VirtualKeyboard();
     ~VirtualKeyboard();
@@ -31,7 +33,6 @@ class VirtualKeyboard
     void setHeader(const std::string &header);
     void setCallback(std::function<void(const std::string &)> callback);
 
-    // Navigation methods for encoder input
     void moveCursorUp();
     void moveCursorDown();
     void moveCursorLeft();
@@ -39,16 +40,17 @@ class VirtualKeyboard
     void handlePress();
     void handleLongPress();
 
-    // Timeout management
     void resetTimeout();
     bool isTimedOut() const;
+
+    void showMultiTapFeedback(char c);
 
   private:
     static const uint8_t KEYBOARD_ROWS = 4;
     static const uint8_t KEYBOARD_COLS = 11;
     static const uint8_t KEY_WIDTH = 9;
-    static const uint8_t KEY_HEIGHT = 9;        // Compressed to fit 4 rows on 64px displays
-    static const uint8_t KEYBOARD_START_Y = 26; // Start just below input box bottom
+    static const uint8_t KEY_HEIGHT = 9;
+    static const uint8_t KEYBOARD_START_Y = 26;
 
     VirtualKey keyboard[KEYBOARD_ROWS][KEYBOARD_COLS];
 
@@ -59,16 +61,23 @@ class VirtualKeyboard
     uint8_t cursorRow;
     uint8_t cursorCol;
 
-    // Timeout management for auto-exit
     uint32_t lastActivityTime;
-    static const uint32_t TIMEOUT_MS = 60000; // 1 minute timeout
+    static const uint32_t TIMEOUT_MS = 60000;
+
+    // Display-only state for physical Chatter multi-tap feedback.
+    bool multiTapFeedbackActive;
+    char multiTapActiveChar;
+    char multiTapKey;
+    std::string multiTapGroup;
+    uint32_t multiTapFeedbackTime;
+    static const uint32_t MULTITAP_FEEDBACK_MS = 1000;
 
     void initializeKeyboard();
     void drawKey(OLEDDisplay *display, const VirtualKey &key, bool selected, int16_t x, int16_t y, uint8_t w, uint8_t h,
                  bool isLastCol);
     void drawInputArea(OLEDDisplay *display, int16_t offsetX, int16_t offsetY, int16_t keyboardStartY);
+    void drawMultiTapFeedback(OLEDDisplay *display, int16_t offsetX, int16_t offsetY, int16_t keyboardStartY);
 
-    // Unified cursor movement helper
     void moveCursorDelta(int dRow, int dCol);
 
     char getCharForKey(const VirtualKey &key, bool isLongPress = false);

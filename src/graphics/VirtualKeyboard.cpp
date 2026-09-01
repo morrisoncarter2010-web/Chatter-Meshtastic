@@ -11,7 +11,9 @@
 namespace graphics
 {
 
-VirtualKeyboard::VirtualKeyboard() : cursorRow(0), cursorCol(0), lastActivityTime(millis())
+VirtualKeyboard::VirtualKeyboard()
+    : cursorRow(0), cursorCol(0), lastActivityTime(millis()), multiTapFeedbackActive(false), multiTapActiveChar(0),
+      multiTapKey(0), multiTapFeedbackTime(0)
 {
     initializeKeyboard();
     // Set cursor to H(2, 5)
@@ -154,6 +156,16 @@ void VirtualKeyboard::draw(OLEDDisplay *display, int16_t offsetX, int16_t offset
     // Draw input area above keyboard
     drawInputArea(display, offsetX, offsetY, keyboardStartY);
 
+    // While the physical Chatter keypad is actively cycling a multi-tap key,
+    // temporarily replace the QWERTY grid with a large visual indicator.
+    if (multiTapFeedbackActive) {
+        if ((millis() - multiTapFeedbackTime) < MULTITAP_FEEDBACK_MS) {
+            drawMultiTapFeedback(display, offsetX, offsetY, keyboardStartY);
+            return;
+        }
+        multiTapFeedbackActive = false;
+    }
+
     // Precompute per-column x and width with leftover distributed over left columns for even spacing
     int colX[KEYBOARD_COLS];
     int colW[KEYBOARD_COLS];
@@ -182,6 +194,127 @@ void VirtualKeyboard::draw(OLEDDisplay *display, int16_t offsetX, int16_t offset
                 drawKey(display, k, selected, x, y, (uint8_t)w, (uint8_t)h, isLastCol);
             }
         }
+    }
+}
+
+void VirtualKeyboard::showMultiTapFeedback(char c)
+{
+    multiTapActiveChar = c;
+    multiTapKey = 0;
+    multiTapGroup.clear();
+
+    switch (c) {
+    case '.': case ',': case '?': case '1':
+        multiTapKey = '1'; multiTapGroup = ".,?1"; break;
+    case '!': case '+': case '-':
+        multiTapKey = '1'; multiTapGroup = "!+-1"; break;
+    case 'a': case 'b': case 'c': case '2':
+        multiTapKey = '2'; multiTapGroup = "abc2"; break;
+    case 'A': case 'B': case 'C':
+        multiTapKey = '2'; multiTapGroup = "ABC2"; break;
+    case 'd': case 'e': case 'f': case '3':
+        multiTapKey = '3'; multiTapGroup = "def3"; break;
+    case 'D': case 'E': case 'F':
+        multiTapKey = '3'; multiTapGroup = "DEF3"; break;
+    case 'g': case 'h': case 'i': case '4':
+        multiTapKey = '4'; multiTapGroup = "ghi4"; break;
+    case 'G': case 'H': case 'I':
+        multiTapKey = '4'; multiTapGroup = "GHI4"; break;
+    case 'j': case 'k': case 'l': case '5':
+        multiTapKey = '5'; multiTapGroup = "jkl5"; break;
+    case 'J': case 'K': case 'L':
+        multiTapKey = '5'; multiTapGroup = "JKL5"; break;
+    case 'm': case 'n': case 'o': case '6':
+        multiTapKey = '6'; multiTapGroup = "mno6"; break;
+    case 'M': case 'N': case 'O':
+        multiTapKey = '6'; multiTapGroup = "MNO6"; break;
+    case 'p': case 'q': case 'r': case 's':
+        multiTapKey = '7'; multiTapGroup = "pqrs"; break;
+    case 'P': case 'Q': case 'R': case 'S':
+        multiTapKey = '7'; multiTapGroup = "PQRS"; break;
+    case '7':
+        multiTapKey = '7'; multiTapGroup = "7"; break;
+    case 't': case 'u': case 'v': case '8':
+        multiTapKey = '8'; multiTapGroup = "tuv8"; break;
+    case 'T': case 'U': case 'V':
+        multiTapKey = '8'; multiTapGroup = "TUV8"; break;
+    case 'w': case 'x': case 'y': case 'z':
+        multiTapKey = '9'; multiTapGroup = "wxyz"; break;
+    case 'W': case 'X': case 'Y': case 'Z':
+        multiTapKey = '9'; multiTapGroup = "WXYZ"; break;
+    case '9':
+        multiTapKey = '9'; multiTapGroup = "9"; break;
+    case ' ':
+        multiTapKey = '0'; multiTapGroup = "SPACE"; break;
+    case '0':
+        multiTapKey = '0'; multiTapGroup = "0"; break;
+    default:
+        return;
+    }
+
+    multiTapFeedbackTime = millis();
+    multiTapFeedbackActive = true;
+}
+
+void VirtualKeyboard::drawMultiTapFeedback(OLEDDisplay *display, int16_t offsetX, int16_t offsetY, int16_t keyboardStartY)
+{
+    const int screenW = display->getWidth();
+    const int screenH = display->getHeight();
+    const int areaTop = offsetY + keyboardStartY;
+    const int areaH = std::max(1, screenH - areaTop);
+
+    display->setColor(WHITE);
+    display->setFont(FONT_SMALL);
+    display->setTextAlignment(TEXT_ALIGN_LEFT);
+
+    // Key number centered near the top of the keyboard area.
+    char keyLabel[2] = {multiTapKey, '\0'};
+    int keyW = display->getStringWidth(keyLabel);
+    int keyY = areaTop + std::max(1, areaH / 8);
+    display->drawString(offsetX + (screenW - keyW) / 2, keyY, keyLabel);
+
+    // Center the complete group and invert only the currently selected character.
+    const int gap = std::max(4, screenW / 32);
+    int totalW = 0;
+    for (size_t i = 0; i < multiTapGroup.size(); ++i) {
+        char label[2] = {multiTapGroup[i], '\0'};
+        totalW += display->getStringWidth(label) + 6;
+        if (i + 1 < multiTapGroup.size())
+            totalW += gap;
+    }
+
+    int x = offsetX + std::max(0, (screenW - totalW) / 2);
+    int y = areaTop + std::max(FONT_HEIGHT_SMALL + 3, areaH / 2 - FONT_HEIGHT_SMALL / 2);
+
+    for (size_t i = 0; i < multiTapGroup.size(); ++i) {
+        char shown = multiTapGroup[i];
+        char label[2] = {shown, '\0'};
+        int charW = display->getStringWidth(label);
+        int boxW = charW + 6;
+        bool selected = (shown == multiTapActiveChar);
+
+        // The physical 0 key emits a space; show SPACE as a single highlighted label.
+        if (multiTapGroup == "SPACE") {
+            const char *spaceLabel = "SPACE";
+            int spaceW = display->getStringWidth(spaceLabel);
+            int bx = offsetX + (screenW - (spaceW + 10)) / 2;
+            int by = y - 2;
+            display->fillRect(bx, by, spaceW + 10, FONT_HEIGHT_SMALL + 4);
+            display->setColor(BLACK);
+            display->drawString(bx + 5, y, spaceLabel);
+            display->setColor(WHITE);
+            return;
+        }
+
+        if (selected) {
+            display->fillRect(x, y - 2, boxW, FONT_HEIGHT_SMALL + 4);
+            display->setColor(BLACK);
+        }
+        display->drawString(x + 3, y, label);
+        if (selected)
+            display->setColor(WHITE);
+
+        x += boxW + gap;
     }
 }
 

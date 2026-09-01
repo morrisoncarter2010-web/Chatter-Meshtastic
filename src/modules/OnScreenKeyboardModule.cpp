@@ -40,7 +40,6 @@ void OnScreenKeyboardModule::start(const char *header, const char *initialText, 
     if (initialText)
         keyboard->setInputText(initialText);
 
-    // Route VK submission/cancel events back into the module
     keyboard->setCallback([this](const std::string &text) {
         if (text.empty()) {
             this->onCancel();
@@ -49,7 +48,6 @@ void OnScreenKeyboardModule::start(const char *header, const char *initialText, 
         }
     });
 
-    // Maintain legacy compatibility hooks
     NotificationRenderer::virtualKeyboard = keyboard;
     NotificationRenderer::textInputCallback = callback;
 }
@@ -62,7 +60,6 @@ void OnScreenKeyboardModule::stop(bool callEmptyCallback)
         delete keyboard;
         keyboard = nullptr;
     }
-    // Keep NotificationRenderer legacy pointers in sync
     NotificationRenderer::virtualKeyboard = nullptr;
     NotificationRenderer::textInputCallback = nullptr;
     clearPopup();
@@ -92,24 +89,52 @@ bool OnScreenKeyboardModule::processVirtualKeyboardInput(const InputEvent &event
     case INPUT_BROKER_UP_LONG:
         targetKeyboard->moveCursorUp();
         return true;
+
     case INPUT_BROKER_DOWN:
     case INPUT_BROKER_DOWN_LONG:
         targetKeyboard->moveCursorDown();
         return true;
+
     case INPUT_BROKER_LEFT:
     case INPUT_BROKER_ALT_PRESS:
         targetKeyboard->moveCursorLeft();
         return true;
+
     case INPUT_BROKER_RIGHT:
     case INPUT_BROKER_USER_PRESS:
         targetKeyboard->moveCursorRight();
         return true;
+
     case INPUT_BROKER_SELECT:
         targetKeyboard->handlePress();
         return true;
+
     case INPUT_BROKER_SELECT_LONG:
         targetKeyboard->handleLongPress();
         return true;
+
+    // Physical keyboard character input
+    case INPUT_BROKER_ANYKEY:
+        if (event.kbchar == 0x08) {
+            targetKeyboard->deleteCharacter();
+        } else if (event.kbchar >= 0x20 && event.kbchar <= 0x7E) {
+            char c = static_cast<char>(event.kbchar);
+            targetKeyboard->insertCharacter(c);
+
+            // Visual feedback only. SerialKeyboard remains authoritative for
+            // the actual multi-tap cycle, timing, backspace and replacement.
+            targetKeyboard->showMultiTapFeedback(c);
+        }
+
+        targetKeyboard->resetTimeout();
+        return true;
+
+    // Physical keyboard backspace event
+    case INPUT_BROKER_BACK:
+        targetKeyboard->deleteCharacter();
+        targetKeyboard->resetTimeout();
+        return true;
+
     default:
         return false;
     }
@@ -120,19 +145,16 @@ bool OnScreenKeyboardModule::draw(OLEDDisplay *display)
     if (!keyboard)
         return false;
 
-    // Timeout
     if (keyboard->isTimedOut()) {
         onCancel();
         return false;
     }
 
-    // Clear full screen behind keyboard
     display->setColor(BLACK);
     display->fillRect(0, 0, display->getWidth(), display->getHeight());
     display->setColor(WHITE);
     keyboard->draw(display, 0, 0);
 
-    // Draw popup overlay if needed
     drawPopup(display);
     return true;
 }
@@ -172,7 +194,6 @@ void OnScreenKeyboardModule::clearPopup()
 
 void OnScreenKeyboardModule::drawPopupOverlay(OLEDDisplay *display)
 {
-    // Only render the popup overlay (without drawing the keyboard)
     drawPopup(display);
 }
 
@@ -185,7 +206,6 @@ void OnScreenKeyboardModule::drawPopup(OLEDDisplay *display)
         return;
     }
 
-    // Build lines and leverage NotificationRenderer inverted box drawing for consistent style
     constexpr uint16_t maxContentLines = 3;
     const bool hasTitle = popupTitle[0] != '\0';
 
@@ -263,7 +283,6 @@ void OnScreenKeyboardModule::drawPopup(OLEDDisplay *display)
         ptrs.push_back(ln.c_str());
     ptrs.push_back(nullptr);
 
-    // Use the standard notification box drawing from NotificationRenderer
     NotificationRenderer::drawNotificationBox(display, nullptr, ptrs.data(), allLines.size(), 0, 0);
 }
 
